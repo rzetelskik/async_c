@@ -2,6 +2,8 @@
 #define THREADPOOL_H
 
 #include <stddef.h>
+#include <pthread.h>
+#include <stdlib.h>
 
 typedef struct runnable {
   void (*function)(void *, size_t);
@@ -10,7 +12,13 @@ typedef struct runnable {
 } runnable_t;
 
 typedef struct thread_pool {
-
+    pthread_attr_t pthread_attr;
+    pthread_t *threads;
+    volatile size_t num_threads;
+    volatile int8_t stop;
+    pthread_mutex_t lock;
+    pthread_cond_t idle;
+    struct queue *task_queue;
 } thread_pool_t;
 
 int thread_pool_init(thread_pool_t *pool, size_t pool_size);
