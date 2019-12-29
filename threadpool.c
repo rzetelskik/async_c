@@ -161,6 +161,7 @@ void thread_pool_destroy(thread_pool_t *pool) {
     if (pthread_mutex_destroy(&pool->lock) != 0) err_exit("pthread_mutex_destroy error");
 
     queue_destroy(pool->task_queue);
+    free(pool->task_queue);
     free(pool->threads);
 }
 

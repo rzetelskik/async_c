@@ -50,6 +50,7 @@ void *await(future_t *future) {
     }
 
     if (pthread_mutex_unlock(&future->lock) != 0) err_exit("pthread_mutex_unlock error");
+    //TODO destroy resources
 
     return future->retval;
 }
