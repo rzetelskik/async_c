@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <unistd.h> //TODO
 
+#define POOL_SIZE 4
+
 typedef struct cell_data {
     u_int64_t time;
     int64_t retval;
@@ -15,7 +17,10 @@ void *calc_cell(void *arg, __attribute__((unused)) size_t size, __attribute__((u
 
 int main() { //TODO exception handling
     thread_pool_t pool;
-    thread_pool_init(&pool, 4);
+    if (thread_pool_init(&pool, POOL_SIZE) != 0) {
+        perror("thread_pool_init error");
+        return 1;
+    };
 
     u_int64_t k, n;
     scanf("%lu %lu", &k, &n);
@@ -25,10 +30,19 @@ int main() { //TODO exception handling
     for (u_int64_t i = 0; i < k; i++) {
         for (u_int64_t j = 0; j < n; j++) {
             cell_data_t *cell_data = malloc(sizeof(cell_data_t));
+            if (!cell_data) {
+                perror("memory allocation error");
+                thread_pool_destroy(&pool);
+                return 1;
+            }
             scanf("%ld %lu", &cell_data->retval, &cell_data->time);
-            async(&pool, &futures[i][j], (callable_t){.function = calc_cell,
-                                                            .arg = cell_data,
-                                                            .argsz = 0});
+            if (async(&pool, &futures[i][j],
+                    (callable_t){.function = calc_cell, .arg = cell_data, .argsz = 0}) != 0) {
+                perror("async error");
+                free(cell_data);
+                thread_pool_destroy(&pool);
+                return 1;
+            };
         }
     }
 

@@ -1,6 +1,8 @@
 #include "future.h"
 #include <stdio.h>
 
+#define POOL_SIZE 3
+
 typedef struct iter {
     u_int64_t k;
     u_int64_t retval;
@@ -14,7 +16,10 @@ void *multiply(void *arg, __attribute__((unused)) size_t size, __attribute__((un
 
 int main() {
     thread_pool_t pool;
-    thread_pool_init(&pool, 3);
+    if (thread_pool_init(&pool, POOL_SIZE) != 0) {
+        perror("thread_pool_init error");
+        return 1;
+    }
 
     u_int64_t n;
     future_t future[2];
@@ -23,10 +28,18 @@ int main() {
 
     scanf("%ld", &n);
 
-    async(&pool, &future[curr], (callable_t){.function = multiply, .arg = &iter, .argsz = sizeof(iter_t)});
+    if (async(&pool, &future[curr],
+            (callable_t){.function = multiply, .arg = &iter, .argsz = sizeof(iter_t)}) != 0) {
+        thread_pool_destroy(&pool);
+        return 1;
+    };
+
     while (iter.k < n) { //TODO change this
         curr ^= 1;
-        map(&pool, &future[curr], &future[curr ^ 1], multiply);
+        if (map(&pool, &future[curr], &future[curr ^ 1], multiply) != 0) {
+            thread_pool_destroy(&pool);
+            return 1;
+        };
     }
 
     await(&future[curr]);
