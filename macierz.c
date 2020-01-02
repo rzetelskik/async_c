@@ -19,7 +19,7 @@ int main() { //TODO exception handling
     thread_pool_t pool;
     if (thread_pool_init(&pool, POOL_SIZE) != 0) {
         perror("thread_pool_init error");
-        return 1;
+        return -1;
     };
 
     u_int64_t k, n;
@@ -33,7 +33,7 @@ int main() { //TODO exception handling
             if (!cell_data) {
                 perror("memory allocation error");
                 thread_pool_destroy(&pool);
-                return 1;
+                return -1;
             }
             scanf("%ld %lu", &cell_data->retval, &cell_data->time);
             if (async(&pool, &futures[i][j],
@@ -41,7 +41,7 @@ int main() { //TODO exception handling
                 perror("async error");
                 free(cell_data);
                 thread_pool_destroy(&pool);
-                return 1;
+                return -1;
             };
         }
     }
@@ -52,6 +52,7 @@ int main() { //TODO exception handling
             cell_data_t *cell_data = (cell_data_t *) await(&futures[i][j]);
             retval += cell_data->retval;
             free(cell_data);
+            future_destroy(&futures[i][j]);
         }
         printf("%ld\n", retval);
     }

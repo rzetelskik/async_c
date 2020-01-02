@@ -23,4 +23,6 @@ int map(thread_pool_t *pool, future_t *future, future_t *from,
 
 void *await(future_t *future);
 
+void future_destroy(future_t *future);
+
 #endif
