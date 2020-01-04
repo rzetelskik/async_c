@@ -22,7 +22,7 @@ int main() { //TODO exception handling
         return -1;
     };
 
-    u_int64_t k, n;
+    u_int64_t k = 0, n = 0;
     scanf("%lu %lu", &k, &n);
 
     future_t futures[k][n];
@@ -40,6 +40,7 @@ int main() { //TODO exception handling
                     (callable_t){.function = calc_cell, .arg = cell_data, .argsz = 0}) != 0) {
                 perror("async error");
                 free(cell_data);
+                //TODO future destroy
                 thread_pool_destroy(&pool);
                 return -1;
             };

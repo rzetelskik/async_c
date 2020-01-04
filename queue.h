@@ -11,9 +11,9 @@ typedef struct queue {
 
 void queue_init(queue_t *queue);
 
-int queue_push(queue_t *queue, void *elem);
+int queue_push_back(queue_t *queue, void *elem);
 
-void *queue_pull(queue_t *queue);
+void *queue_pop_front(queue_t *queue);
 
 int queue_is_empty(queue_t *queue);
 

@@ -31,7 +31,7 @@ int main() {
     iter_t iter = {.k = 1, .retval = 1};
 
     scanf("%ld", &n);
-    future_t futures[n];
+    future_t futures[n ? n : 1];
 
     if (async(&pool, &futures[k],
             (callable_t){.function = multiply, .arg = &iter, .argsz = sizeof(iter_t)}) != 0) {

@@ -19,7 +19,7 @@ void queue_node_init(queue_node_t *queue_node, void *elem) {
     queue_node->next = queue_node->prev = NULL;
 }
 
-int queue_push(queue_t *queue, void *elem) {
+int queue_push_back(queue_t *queue, void *elem) {
     queue_node_t *new_node = malloc(sizeof(queue_node_t));
     if (!new_node) return 1;
 
@@ -40,7 +40,7 @@ int queue_push(queue_t *queue, void *elem) {
     return 0;
 }
 
-void *queue_pull(queue_t *queue) {
+void *queue_pop_front(queue_t *queue) {
     void *retval = NULL;
 
     if (pthread_mutex_lock(&queue->lock) != 0) syserr("pthread_mutex_lock error\n");

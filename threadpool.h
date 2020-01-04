@@ -15,7 +15,7 @@ typedef struct runnable {
 typedef struct thread_pool {
     pthread_t *threads;
     volatile size_t num_threads;
-    volatile int8_t stop;
+    volatile int8_t terminate;
     pthread_mutex_t lock;
     pthread_cond_t idle;
     queue_t task_queue;
