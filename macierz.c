@@ -1,6 +1,6 @@
 #include "future.h"
 #include <stdio.h>
-#include <unistd.h> //TODO
+#include <unistd.h>
 
 #define POOL_SIZE 4
 
@@ -9,13 +9,13 @@ typedef struct cell_data {
     int64_t retval;
 } cell_data_t;
 
-void *calc_cell(void *arg, __attribute__((unused)) size_t size, __attribute__((unused)) size_t* retsz) {
+void *calc_cell(void *arg, __attribute__((unused)) size_t size, __attribute__((unused)) size_t *retsz) {
     cell_data_t *cell_data = (cell_data_t *) arg;
     usleep(1000 * cell_data->time);
     return cell_data;
 }
 
-int main() { //TODO exception handling
+int main() {
     thread_pool_t pool;
     if (thread_pool_init(&pool, POOL_SIZE) != 0) {
         perror("thread_pool_init error");
@@ -37,10 +37,9 @@ int main() { //TODO exception handling
             }
             scanf("%ld %lu", &cell_data->retval, &cell_data->time);
             if (async(&pool, &futures[i][j],
-                    (callable_t){.function = calc_cell, .arg = cell_data, .argsz = 0}) != 0) {
+                      (callable_t) {.function = calc_cell, .arg = cell_data, .argsz = 0}) != 0) {
                 perror("async error");
                 free(cell_data);
-                //TODO future destroy
                 thread_pool_destroy(&pool);
                 return -1;
             };

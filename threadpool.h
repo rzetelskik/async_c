@@ -1,7 +1,7 @@
 #ifndef THREADPOOL_H
 #define THREADPOOL_H
 
-#include "queue.h"
+#include "list.h"
 #include <stddef.h>
 #include <pthread.h>
 #include <stdlib.h>
@@ -18,7 +18,7 @@ typedef struct thread_pool {
     volatile int8_t terminate;
     pthread_mutex_t lock;
     pthread_cond_t idle;
-    queue_t task_queue;
+    list_t task_queue;
 } thread_pool_t;
 
 int thread_pool_init(thread_pool_t *pool, size_t pool_size);

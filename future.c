@@ -46,7 +46,7 @@ void async_call(void *arg, __attribute__((unused)) size_t argsz) {
     if (pthread_mutex_lock(&async_data->future->lock) != 0) syserr("pthread_mutex_lock error\n");
 
     async_data->future->retval =
-            (void*) async_data->callable.function(async_data->callable.arg, async_data->callable.argsz, &discard);
+            (void *) async_data->callable.function(async_data->callable.arg, async_data->callable.argsz, &discard);
     async_data->future->ready = 1;
 
     if (pthread_cond_broadcast(&async_data->future->cond) != 0) syserr("pthread_cond_broadcast error\n");
@@ -55,7 +55,6 @@ void async_call(void *arg, __attribute__((unused)) size_t argsz) {
 }
 
 int async(thread_pool_t *pool, future_t *future, callable_t callable) {
-    //TODO return err if pool was not initialised
     async_data_t *async_data = malloc(sizeof(async_data_t));
     if (!async_data) return -1;
 
@@ -63,7 +62,7 @@ int async(thread_pool_t *pool, future_t *future, callable_t callable) {
     async_data_init(async_data, callable, future);
 
     if (defer(pool,
-            (runnable_t) {.function = async_call, .arg = async_data, .argsz = sizeof(*async_data)}) != 0) {
+              (runnable_t) {.function = async_call, .arg = async_data, .argsz = sizeof(*async_data)}) != 0) {
         future_destroy(future);
         free(async_data);
         return -1;
@@ -90,7 +89,7 @@ void map_call(void *arg, __attribute__((unused)) size_t argsz) {
 
     if (pthread_mutex_lock(&map_data->future->lock) != 0) syserr("pthread_mutex_lock error\n");
 
-    map_data->future->retval = (void*) map_data->function(await(map_data->from), 0, &discard);
+    map_data->future->retval = (void *) map_data->function(await(map_data->from), 0, &discard);
     map_data->future->ready = 1;
 
     if (pthread_cond_broadcast(&map_data->future->cond) != 0) syserr("pthread_cond_broadcast error\n");
@@ -99,7 +98,6 @@ void map_call(void *arg, __attribute__((unused)) size_t argsz) {
 }
 
 int map(thread_pool_t *pool, future_t *future, future_t *from, function_t function) {
-    //TODO return err if pool was not initialised
     map_data_t *map_data = malloc(sizeof(map_data_t));
     if (!map_data) return -1;
 
