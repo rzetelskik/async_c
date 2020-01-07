@@ -2,85 +2,75 @@
 #include "err.h"
 #include <stdio.h>
 #include <signal.h>
+        
+pthread_rwlock_t no_defer_lock;
+int8_t no_defer;
+pthread_t threadpool_manager;
+list_t threadpool_list;
+sigset_t block_mask;
 
-typedef struct thread_pool_handler {
-    pthread_mutex_t lock;
-    int8_t terminate;
-    list_t list;
-    struct sigaction act;
-    struct sigaction oldact;
-    sigset_t sigint_block;
-} thread_pool_handler_t;
-
-thread_pool_handler_t tp_handler;
-
-void thread_pool_handler_terminate(int sig, siginfo_t *siginfo, void *discard);
-
-void set_sigint_block() {
-    sigemptyset(&tp_handler.sigint_block);
-    sigaddset(&tp_handler.sigint_block, SIGINT);
-}
-
-void set_sigaction() {
-    tp_handler.act.sa_sigaction = thread_pool_handler_terminate;
-    tp_handler.act.sa_flags = SA_SIGINFO;
-    if (sigaction(SIGINT, &tp_handler.act, &tp_handler.oldact) != 0) syserr("sigaction error\n");
-}
+void threadpool_manager_work(void *discard);
 
 __attribute__((constructor))
-void thread_pool_handler_init() {
-    if (pthread_mutex_init(&tp_handler.lock, 0) != 0) syserr("pthread_mutex_init error\n");
-    tp_handler.terminate = 0;
-    list_init(&tp_handler.list);
-    set_sigint_block();
-    set_sigaction();
+void threadpool_manager_init() {
+    no_defer = 0;
+    if (sigemptyset(&block_mask) != 0) syserr("sigemptyset error\n");
+    if (sigaddset(&block_mask, SIGINT) != 0) syserr("sigaddset error\n");
+    if (pthread_rwlock_init(&no_defer_lock, 0) != 0) syserr("pthread_rwlock_init error\n");
+    if (sigprocmask(SIG_BLOCK, &block_mask, 0) != 0) syserr("sigprocmask error\n");
+    list_init(&threadpool_list);
+    if (pthread_create(&threadpool_manager, 0, (void*) threadpool_manager_work, NULL) != 0)
+        syserr("pthread_create error\n");
+    printf("constructor finished\n");
 }
 
 __attribute__((destructor))
 void thread_pool_handler_destroy() {
-    list_destroy(&tp_handler.list);
-    if (pthread_mutex_destroy(&tp_handler.lock) != 0) syserr("pthread_mutex_destroy error\n");
+    list_destroy(&threadpool_list);
+    if (pthread_cancel(threadpool_manager) != 0) syserr("pthread_cancel error\n");
+    if (pthread_join(threadpool_manager, 0) != 0) syserr("pthread_join error\n");
+    if (pthread_rwlock_destroy(&no_defer_lock) != 0) syserr("pthread_rwlock_destroy error\n");
 }
 
 void thread_pool_destroy_all() {
-    void *pool = list_front(&tp_handler.list);
+    void *pool = list_front(&threadpool_list);
     while (pool) {
         thread_pool_destroy(pool);
-        pool = list_front(&tp_handler.list);
+        pool = list_front(&threadpool_list);
     }
 }
 
-void thread_pool_handler_terminate(__attribute__((unused)) int sig, __attribute__((unused)) siginfo_t *siginfo,
-                                   __attribute__((unused)) void *discard) {
-    if (pthread_mutex_lock(&tp_handler.lock) != 0) syserr("pthread_mutex_lock error\n");
-    tp_handler.terminate = 1;
-    if (pthread_mutex_unlock(&tp_handler.lock) != 0) syserr("pthread_mutex_unlock error\n");
+void threadpool_manager_work(__attribute__((unused)) void *discard) {
+    int sig_discard;
+//    if (pthread_sigmask(SIG_UNBLOCK, &block_mask, 0) != 0) syserr("pthread_sigmask error\n");
+    if (sigwait(&block_mask, &sig_discard) != 0) syserr("sigwait error\n");
+    printf("got sigint\n");
+//    if (pthread_sigmask(SIG_BLOCK, &block_mask, 0) != 0) syserr("pthread_sigmask error\n");
+
+    if (pthread_rwlock_wrlock(&no_defer_lock) != 0) syserr("pthread_rwlock_wrlock error\n");
+    no_defer = 1;
+    if (pthread_rwlock_unlock(&no_defer_lock) != 0) syserr("pthread_rwlock_unlock error\n");
 
     thread_pool_destroy_all();
     thread_pool_handler_destroy();
-
-    signal(SIGINT, tp_handler.oldact.sa_handler);
-    raise(SIGINT);
+    exit(SIGINT);
 }
 
-int global_terminated() {
-    if (pthread_mutex_lock(&tp_handler.lock) != 0) syserr("pthread_mutex_lock error\n");
+int get_no_defer() {
+    if (pthread_rwlock_rdlock(&no_defer_lock) != 0) syserr("pthread_rwlock_rdlock error\n");
+    int retval = no_defer;
+    if (pthread_rwlock_unlock(&no_defer_lock) != 0) syserr("pthread_rwlock_unlock error\n");
 
-    int8_t terminated = tp_handler.terminate;
-
-    if (pthread_mutex_unlock(&tp_handler.lock) != 0) syserr("pthread_mutex_unlock error\n");
-
-    return terminated;
+    return retval;
 }
 
 void thread_pool_work(void *data) {
-    if (pthread_sigmask(SIG_BLOCK, &tp_handler.sigint_block, 0) != 0) syserr("pthread_sigmask error/n");
     thread_pool_t *pool = (thread_pool_t *) data;
 
     if (pthread_mutex_lock(&pool->lock) != 0) syserr("pthread_mutex_lock error\n");
 
-    while (!(pool->terminate || global_terminated()) || !list_is_empty(&pool->task_queue)) {
-        while (!(pool->terminate || global_terminated()) && list_is_empty(&pool->task_queue)) {
+    while (!(pool->terminate || get_no_defer()) || !list_is_empty(&pool->task_queue)) {
+        while (!(pool->terminate || get_no_defer()) && list_is_empty(&pool->task_queue)) {
             if (pthread_cond_wait(&pool->idle, &pool->lock) != 0) syserr("pthread_cond_wait error\n");
         }
         runnable_t *runnable = (runnable_t *) list_pop_front(&pool->task_queue);
@@ -109,11 +99,11 @@ int thread_pool_init(thread_pool_t *pool, size_t num_threads) {
     list_init(&pool->task_queue);
 
     for (size_t i = 0; i < num_threads; i++) {
-        if (pthread_create(&pool->threads[i], 0, (void *) thread_pool_work, pool) != 0)
+        if (pthread_create(&pool->threads[i], 0, (void*) thread_pool_work, pool) != 0)
             syserr("pthread_create error\n");
     }
 
-    if (list_push_back(&tp_handler.list, pool) != 0) {
+    if (list_push_back(&threadpool_list, pool) != 0) {
         thread_pool_destroy(pool);
         return -1;
     }
@@ -132,7 +122,7 @@ void thread_pool_stop(thread_pool_t *pool) {
 
 void thread_pool_destroy(thread_pool_t *pool) {
     thread_pool_stop(pool);
-    list_erase(&tp_handler.list, pool);
+    list_erase(&threadpool_list, pool);
 
     for (size_t i = 0; i < pool->num_threads; i++) {
         if (pthread_join(pool->threads[i], 0) != 0) syserr("pthread_join error\n");
@@ -156,7 +146,7 @@ int thread_pool_terminated(thread_pool_t *pool) {
 }
 
 int defer(struct thread_pool *pool, runnable_t runnable) {
-    if (global_terminated() || thread_pool_terminated(pool)) return -1;
+    if (get_no_defer() || thread_pool_terminated(pool)) return -1;
 
     runnable_t *task = malloc(sizeof(runnable_t));
     if (!task) return -1;

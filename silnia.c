@@ -1,5 +1,6 @@
 #include "future.h"
 #include <stdio.h>
+#include <zconf.h>
 
 #define POOL_SIZE 3
 
@@ -9,6 +10,7 @@ typedef struct iter {
 } iter_t;
 
 void *multiply(void *arg, __attribute__((unused)) size_t size, __attribute__((unused)) size_t *retsz) {
+    sleep(1);
     iter_t *iter = (iter_t *) arg;
     iter->retval *= iter->k++;
     return iter;
@@ -32,7 +34,6 @@ int main() {
 
     scanf("%ld", &n);
     future_t futures[n ? n : 1];
-
 
     if (async(&pool, &futures[k],
               (callable_t) {.function = multiply, .arg = &iter, .argsz = sizeof(iter_t)}) != 0) {
