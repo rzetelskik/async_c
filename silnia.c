@@ -1,5 +1,6 @@
 #include "future.h"
 #include <stdio.h>
+#include <zconf.h>
 
 #define POOL_SIZE 3
 
